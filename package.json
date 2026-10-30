@@ -1,0 +1,17 @@
+{
+  "name": "tmdb-cli",
+  "version": "1.0.0",
+  "description": "CLI, що показує списки фільмів з TMDB API (roadmap.sh TMDB CLI Tool)",
+  "type": "module",
+  "bin": {
+    "tmdb-app": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
