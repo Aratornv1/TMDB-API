@@ -1,8 +1,12 @@
+// Тести клієнтів: TmdbClient і абстрактний ApiClient. Мережа не потрібна: fetch підроблений.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { UserError, parseType, parsePage, buildUrl, fetchMovies } from '../src/tmdb.js';
-import { formatMovie, formatMovies } from '../src/format.js';
-import { parseEnv } from '../src/env.js';
+import { ApiClient } from '../src/ApiClient.js';
+import { TmdbClient } from '../src/TmdbClient.js';
+import { ListType } from '../src/ListType.js';
+import { MoviePage } from '../src/MoviePage.js';
+import { PageNumber } from '../src/PageNumber.js';
+import { ApiError, ConfigError, NetworkError, UserError } from '../src/errors.js';
 
 // Підроблений fetch: повертає задану відповідь і запам'ятовує, з чим його викликали.
 function fakeFetch(response) {
@@ -25,126 +29,82 @@ const fail = (status, body) => ({
   },
 });
 
-test('parseType accepts the four types, case-insensitively', () => {
-  for (const type of ['playing', 'popular', 'top', 'upcoming']) assert.equal(parseType(type), type);
-  assert.equal(parseType(' TOP '), 'top');
+const client = (response, token = 't') => {
+  const fake = fakeFetch(response);
+  return { client: new TmdbClient({ token, fetchImpl: fake.impl }), calls: fake.calls };
+};
+
+test('ApiClient абстрактний: напряму створити не можна', () => {
+  assert.throws(() => new ApiClient(), TypeError);
 });
 
-test('parseType rejects unknown values', () => {
-  for (const bad of ['', 'now_playing', 'toString', undefined]) {
-    assert.throws(() => parseType(bad), UserError);
-  }
-  assert.throws(() => parseType('nope'), /Use one of: playing, popular, top, upcoming/);
+test('нащадок без serviceName одразу падає з пояснення', () => {
+  class Broken extends ApiClient {}
+  assert.throws(() => new Broken().serviceName, /must define serviceName/);
 });
 
-test('parsePage defaults to 1 and accepts 1..500 only', () => {
-  assert.equal(parsePage(), 1);
-  assert.equal(parsePage('3'), 3);
-  assert.equal(parsePage('500'), 500);
-  for (const bad of ['0', '501', '-1', '2.5', 'abc', '']) {
-    assert.throws(() => parsePage(bad), UserError);
-  }
+test('TmdbClient є і ApiClient (успадкування)', () => {
+  const c = new TmdbClient({ token: 't' });
+  assert.ok(c instanceof ApiClient);
+  assert.equal(c.serviceName, 'TMDB');
 });
 
-test('buildUrl maps types to TMDB paths and adds optional params', () => {
-  assert.equal(buildUrl({ type: 'playing' }).href, 'https://api.themoviedb.org/3/movie/now_playing?page=1');
-  assert.equal(buildUrl({ type: 'top', page: 2 }).pathname, '/3/movie/top_rated');
-  const url = buildUrl({ type: 'upcoming', language: 'uk-UA', region: 'UA' });
+test('buildUrl: шлях за типом списку, сторінка за замовчуванням 1, language і region необовʼязкові', () => {
+  const c = new TmdbClient({ token: 't' });
+  assert.equal(c.buildUrl(ListType.PLAYING).href, 'https://api.themoviedb.org/3/movie/now_playing?page=1');
+  assert.equal(c.buildUrl(ListType.TOP, { page: PageNumber.parse('2') }).pathname, '/3/movie/top_rated');
+  const url = c.buildUrl(ListType.UPCOMING, { language: 'uk-UA', region: 'UA' });
   assert.equal(url.searchParams.get('language'), 'uk-UA');
   assert.equal(url.searchParams.get('region'), 'UA');
   assert.equal(url.pathname, '/3/movie/upcoming');
 });
 
-test('fetchMovies sends the bearer token and returns parsed JSON', async () => {
-  const data = { page: 1, results: [] };
-  const { impl, calls } = fakeFetch(ok(data));
-  const result = await fetchMovies({ type: 'popular', page: 1, token: 'abc', fetchImpl: impl });
-  assert.deepEqual(result, data);
+test('list: надсилає Bearer-токен і повертає MoviePage (а не сирий JSON)', async () => {
+  const { client: c, calls } = client(ok({ page: 1, total_pages: 2, results: [{ title: 'A' }] }), 'abc');
+  const page = await c.list(ListType.POPULAR);
+  assert.ok(page instanceof MoviePage);
+  assert.equal(page.movies[0].title, 'A');
   assert.match(calls[0].url, /\/3\/movie\/popular\?page=1$/);
   assert.equal(calls[0].init.headers.Authorization, 'Bearer abc');
+  assert.equal(calls[0].init.headers.accept, 'application/json'); // заголовок із базового класу теж на місці
 });
 
-test('fetchMovies refuses to call the API without a token', async () => {
-  const { impl, calls } = fakeFetch(ok({}));
-  await assert.rejects(fetchMovies({ type: 'top', fetchImpl: impl }), /token is missing/);
+test('list без токена: ConfigError, у мережу не йде', async () => {
+  const { client: c, calls } = client(ok({}), null); // null, бо undefined у client() замінюється токеном за замовчуванням
+  await assert.rejects(c.list(ListType.TOP), (err) => err instanceof ConfigError && /token is missing/.test(err.message));
   assert.equal(calls.length, 0);
 });
 
-test('fetchMovies turns HTTP errors into readable messages', async () => {
+test('HTTP-помилки стають ApiError зі зрозумілим повідомленням і статусом', async () => {
   const cases = [
     [401, { status_message: 'Invalid API key' }, /rejected the token \(401\)/],
     [404, undefined, /404/],
     [429, undefined, /Too many requests/],
     [503, undefined, /having problems \(503\)/],
-    [400, { status_message: 'Invalid page' }, /TMDB error 400: Invalid page/],
+    [400, { status_message: 'Invalid page' }, /TMDB error 400: Invalid page/], // текст із базового класу
   ];
   for (const [status, body, pattern] of cases) {
-    const { impl } = fakeFetch(fail(status, body));
-    await assert.rejects(
-      fetchMovies({ type: 'top', token: 't', fetchImpl: impl }),
-      (err) => err instanceof UserError && pattern.test(err.message),
-    );
+    const { client: c } = client(fail(status, body));
+    await assert.rejects(c.list(ListType.TOP), (err) => (
+      err instanceof ApiError && err instanceof UserError && err.status === status && pattern.test(err.message)
+    ));
   }
 });
 
-test('fetchMovies reports network failures and timeouts', async () => {
+test('помилки мережі й таймаут: NetworkError', async () => {
   const down = Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
   await assert.rejects(
-    fetchMovies({ type: 'top', token: 't', fetchImpl: fakeFetch(down).impl }),
-    /Cannot reach TMDB: ENOTFOUND/,
+    client(down).client.list(ListType.TOP),
+    (err) => err instanceof NetworkError && /Cannot reach TMDB: ENOTFOUND/.test(err.message) && err.cause === down,
   );
   const slow = Object.assign(new Error('timeout'), { name: 'TimeoutError' });
-  await assert.rejects(
-    fetchMovies({ type: 'top', token: 't', fetchImpl: fakeFetch(slow).impl }),
-    /request timed out/,
-  );
+  await assert.rejects(client(slow).client.list(ListType.TOP), /request timed out/);
 });
 
-test('fetchMovies rejects a body that is not JSON', async () => {
+test('тіло, що не JSON: ApiError «invalid response»', async () => {
   const broken = { ok: true, status: 200, json: async () => { throw new SyntaxError('bad'); } };
   await assert.rejects(
-    fetchMovies({ type: 'top', token: 't', fetchImpl: fakeFetch(broken).impl }),
-    /invalid response/,
+    client(broken).client.list(ListType.TOP),
+    (err) => err instanceof ApiError && /invalid response/.test(err.message),
   );
-});
-
-test('formatMovies prints header, rating and overview', () => {
-  const data = {
-    page: 1,
-    total_pages: 3,
-    results: [{ title: 'Alpha', release_date: '2023-04-05', vote_average: 7.456, vote_count: 1456, overview: 'Short.' }],
-  };
-  assert.equal(
-    formatMovies(data, 'Now Playing'),
-    'Now Playing movies - page 1 of 3\n\n1. Alpha (2023) - 7.5/10 (1456 votes)\n   Short.',
-  );
-});
-
-test('formatMovies numbers movies continuously across pages', () => {
-  const movie = { title: 'B', release_date: '2024-01-01', vote_average: 5, vote_count: 2, overview: 'x' };
-  assert.match(formatMovies({ page: 2, total_pages: 5, results: [movie] }, 'Popular'), /\n21\. B \(2024\)/);
-});
-
-test('formatMovie handles missing date, no votes, one vote and no overview', () => {
-  assert.equal(
-    formatMovie({ title: 'Ghost', release_date: '', vote_count: 0, overview: '' }, 1),
-    '1. Ghost (n/a) - no ratings yet',
-  );
-  assert.match(formatMovie({ title: 'One', release_date: '2020-02-02', vote_average: 8, vote_count: 1, overview: 'x' }, 4), /8\.0\/10 \(1 vote\)/);
-});
-
-test('formatMovie shortens long overviews to one line', () => {
-  const movie = { title: 'Long', release_date: '2020-01-01', vote_average: 1, vote_count: 5, overview: `line one\n${'word '.repeat(60)}` };
-  const second = formatMovie(movie, 1).split('\n')[1];
-  assert.ok(second.length <= 3 + 110);
-  assert.ok(second.endsWith('...'));
-});
-
-test('formatMovies says so when the list is empty', () => {
-  assert.equal(formatMovies({ page: 1, total_pages: 0, results: [] }, 'Top Rated'), 'Top Rated movies - page 1 of 0\n\nNo movies found.');
-});
-
-test('parseEnv reads KEY=VALUE, skips comments and strips quotes', () => {
-  const env = parseEnv('# comment\nTMDB_ACCESS_TOKEN="abc.def"\r\n\nOTHER = plain value \nbad line\n');
-  assert.deepEqual(env, { TMDB_ACCESS_TOKEN: 'abc.def', OTHER: 'plain value' });
 });

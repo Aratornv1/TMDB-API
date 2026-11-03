@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TMDB CLI: розбір ООП-версії</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: sticky table of contents on the left, one reading column on the right; single column on phones. */
+:root {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --ink: #17212b;
+  --muted: #5b6b7a;
+  --line: #d9e1e8;
+  --accent: #0b6fa4;
+  --accent-soft: #e1f0f8;
+  --code-bg: #eef2f6;
+  --warn: #8a5a00;
+  --warn-soft: #fff3d6;
+  --good: #1a7f4b;
+  --good-soft: #def5e8;
+  --bad: #b3261e;
+  --bad-soft: #fde7e5;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1720; --surface: #17212b; --ink: #e4ebf1; --muted: #92a3b3; --line: #2a3745;
+    --accent: #5cb8e6; --accent-soft: #14303f; --code-bg: #0c141b;
+    --warn: #f0c36a; --warn-soft: #3a2f12; --good: #6fd29b; --good-soft: #12301f;
+    --bad: #ff8d84; --bad-soft: #3d1a17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1720; --surface: #17212b; --ink: #e4ebf1; --muted: #92a3b3; --line: #2a3745;
+  --accent: #5cb8e6; --accent-soft: #14303f; --code-bg: #0c141b;
+  --warn: #f0c36a; --warn-soft: #3a2f12; --good: #6fd29b; --good-soft: #12301f;
+  --bad: #ff8d84; --bad-soft: #3d1a17;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.6; }
+a { color: var(--accent); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.shell { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 40px; max-width: 1080px; margin: 0 auto; padding: 32px 20px 80px; }
+nav.toc { position: sticky; top: 24px; align-self: start; font-size: 14px; }
+nav.toc p { margin: 0 0 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; counter-reset: s; }
+nav.toc li { counter-increment: s; }
+nav.toc a { display: block; padding: 5px 10px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; }
+nav.toc a::before { content: counter(s) ". "; font-variant-numeric: tabular-nums; }
+nav.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+
+main { min-width: 0; }
+header.top { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+header.top .tag { font: 500 13px var(--font-mono); color: var(--accent); }
+h1 { margin: 6px 0 10px; font-size: 34px; line-height: 1.15; font-weight: 600; text-wrap: balance; }
+header.top p { margin: 0; max-width: 62ch; color: var(--muted); }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.chip { font: 500 12px var(--font-mono); padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+
+section { padding-top: 36px; }
+h2 { margin: 0 0 12px; font-size: 24px; line-height: 1.25; font-weight: 600; text-wrap: balance; }
+h3 { margin: 28px 0 8px; font-size: 18px; font-weight: 600; }
+p { margin: 0 0 12px; max-width: 70ch; }
+ul, ol { max-width: 70ch; padding-left: 22px; margin: 0 0 12px; }
+li { margin-bottom: 4px; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+
+.file { margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.file > .name { display: flex; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); font: 500 13px var(--font-mono); color: var(--muted); background: var(--code-bg); }
+.file > .name b { color: var(--ink); font-weight: 500; }
+pre { margin: 0; padding: 14px; overflow-x: auto; background: var(--surface); font: 13px/1.55 var(--font-mono); tab-size: 2; }
+pre code { background: none; padding: 0; font-size: inherit; }
+
+.note { margin: 14px 0; padding: 12px 16px; border-radius: 8px; border-left: 4px solid var(--accent); background: var(--accent-soft); max-width: 70ch; }
+.note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.note.good { border-left-color: var(--good); background: var(--good-soft); }
+.note.bad { border-left-color: var(--bad); background: var(--bad-soft); }
+.note p:last-child, .note ul:last-child { margin-bottom: 0; }
+.note strong.t { display: block; margin-bottom: 2px; }
+
+.tablewrap { overflow-x: auto; margin: 12px 0 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--code-bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; }
+td code { white-space: nowrap; }
+
+.flow { margin: 16px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px; overflow-x: auto; }
+.flow svg { display: block; min-width: 720px; width: 100%; height: auto; }
+.flow .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.flow .box.hot { fill: var(--accent-soft); stroke: var(--accent); }
+.flow .lbl { font: 600 13px var(--font-body); fill: var(--ink); }
+.flow .sub { font: 12px var(--font-mono); fill: var(--muted); }
+.flow .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.flow .arrowhead { fill: var(--muted); }
+.flow .cap { font: 12px var(--font-body); fill: var(--muted); }
+
+ol.steps { list-style: none; padding: 0; counter-reset: st; display: flex; flex-direction: column; gap: 10px; max-width: 76ch; }
+ol.steps li { counter-increment: st; display: grid; grid-template-columns: 30px 1fr; gap: 12px; margin: 0; }
+ol.steps li::before { content: counter(st); display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--surface); font: 600 14px var(--font-body); }
+ol.steps li div { padding-top: 3px; }
+
+details { margin: 10px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); max-width: 76ch; }
+summary { cursor: pointer; padding: 10px 14px; font-weight: 500; }
+details[open] summary { border-bottom: 1px solid var(--line); }
+details .inner { padding: 12px 14px 4px; }
+
+.status { display: inline-block; font: 500 12px var(--font-mono); padding: 2px 8px; border-radius: 999px; }
+.status.ok { background: var(--good-soft); color: var(--good); }
+.status.no { background: var(--warn-soft); color: var(--warn); }
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; gap: 0; padding: 20px 16px 60px; }
+  nav.toc { position: static; margin-bottom: 8px; }
+  nav.toc ol { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  nav.toc a { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+  h1 { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="toc" aria-label="Зміст">
+  <p>Зміст</p>
+  <ol>
+    <li><a href="#big-picture">Що змінилось і навіщо</a></li>
+    <li><a href="#map">Карта класів</a></li>
+    <li><a href="#concepts">Чотири стовпи ООП на цьому коді</a></li>
+    <li><a href="#request">Шлях одного запиту</a></li>
+    <li><a href="#errors">Ієрархія помилок</a></li>
+    <li><a href="#domain">Доменні класи: ListType, PageNumber, Movie, MoviePage</a></li>
+    <li><a href="#client">ApiClient і TmdbClient: наслідування й поліморфізм</a></li>
+    <li><a href="#formatter">MovieFormatter: показ окремо від даних</a></li>
+    <li><a href="#app">CliApp і cli.js: ін'єкція залежностей</a></li>
+    <li><a href="#config">Config і EnvFile</a></li>
+    <li><a href="#tests">Тести</a></li>
+    <li><a href="#exercises">Вправи</a></li>
+    <li><a href="#status">Що перевірено</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="top">
+  <span class="tag">roadmap task/tmdb-cli · гілка refactor-oop</span>
+  <h1>TMDB CLI: розбір ООП-версії</h1>
+  <p>CLI зі списками фільмів TMDB, переписаний із функцій на класи: ієрархія помилок, абстрактний клієнт із шаблонним методом, value object-и, модель фільму й ін'єкція залежностей. Нижче видно, що робить кожен клас, чому код розкладено саме так і як це перевіряють тести.</p>
+  <div class="meta">
+    <span class="chip">Node.js ≥ 18</span>
+    <span class="chip">0 залежностей</span>
+    <span class="chip">ES2022 класи</span>
+    <span class="chip">приватні поля #</span>
+    <span class="chip">node:test</span>
+    <span class="chip">34 тести</span>
+  </div>
+</header>
+
+<!-- 1 -->
+<section id="big-picture">
+  <h2>1. Що змінилось і навіщо</h2>
+  <p>Раніше програма була набором <strong>функцій і плоских об'єктів</strong>: <code>parseType</code>, <code>parsePage</code>, <code>fetchMovies</code>, <code>formatMovies</code>. Тепер у ній є <strong>класи</strong>: кожен має одну роль, власні дані й методи, які працюють саме з цими даними. Поведінка не змінилась: вивід усіх сценаріїв командного рядка збігається з виводом старої версії символ у символ (див. розділ «Що перевірено»).</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Було (функції)</th><th>Стало (класи)</th><th>Що дає</th></tr></thead>
+    <tbody>
+      <tr><td><code>TYPES</code> — об'єкт, <code>parseType(value)</code></td><td><code>ListType</code></td><td>тип списку знає свій шлях і заголовок; створити неправильний неможливо</td></tr>
+      <tr><td><code>parsePage(value)</code> → число</td><td><code>PageNumber</code></td><td>якщо в руках <code>PageNumber</code>, він уже перевірений</td></tr>
+      <tr><td>сирий JSON від TMDB</td><td><code>Movie</code>, <code>MoviePage</code></td><td>решта коду не знає про <code>snake_case</code> чужого API</td></tr>
+      <tr><td><code>formatMovies(data, title)</code></td><td><code>MovieFormatter</code></td><td>«як показати» окремо від «що показати»; форматер можна замінити</td></tr>
+      <tr><td><code>fetchMovies({...})</code> — одна довга функція</td><td><code>ApiClient</code> → <code>TmdbClient</code></td><td>загальний алгоритм запиту в базовому класі, специфіка TMDB у нащадку</td></tr>
+      <tr><td><code>UserError</code> — один клас</td><td>ієрархія <code>UserError</code> → 4 нащадки</td><td>можна відрізнити «погані аргументи» від «немає мережі»</td></tr>
+      <tr><td><code>parseEnv(text)</code>, <code>loadEnvFile(file)</code></td><td><code>EnvFile</code>, <code>Config</code></td><td>читання файлу й вибір токена — окремі відповідальності</td></tr>
+      <tr><td>функція <code>main</code> в <code>cli.js</code></td><td><code>CliApp</code> + composition root</td><td>усі залежності передаються в конструктор, тож програму можна тестувати без мережі й консолі</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note"><strong class="t">Чи завжди класи кращі за функції?</strong>
+    <p>Ні. Для програми на 300 рядків функції були цілком нормальні, і ця версія навмисно навчальна: вона показує, <em>як</em> виглядають інкапсуляція, успадкування, поліморфізм і ін'єкція залежностей на живому коді. Кожен розділ нижче пояснює, що саме тут «з ООП» і що воно дає на практиці.</p></div>
+</section>
+
+<!-- 2 -->
+<section id="map">
+  <h2>2. Карта класів</h2>
+  <div class="file"><div class="name"><b>Діаграма залежностей</b><span>стрілка = «використовує»</span></div>
+<pre><code>cli.js  (composition root: створює все й з'єднує)
+  │
+  ├─ Config ◄── EnvFile
+  ├─ TmdbClient ───► ApiClient            (успадкування)
+  └─ CliApp
+       ├─ ListType.parse()      → ListType      (тип списку)
+       ├─ PageNumber.parse()    → PageNumber    (номер сторінки)
+       ├─ client.list()         → MoviePage ──► Movie[]
+       └─ MovieFormatter.format(MoviePage)      → текст
+
+errors.js:  UserError ◄─ UsageError | ConfigError | NetworkError | ApiError</code></pre></div>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Файл</th><th>Клас</th><th>Роль</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/cli.js</code></td><td>—</td><td>точка входу, composition root</td></tr>
+      <tr><td><code>src/CliApp.js</code></td><td><code>CliApp</code></td><td>розбір аргументів, запуск, друк, коди виходу</td></tr>
+      <tr><td><code>src/TmdbClient.js</code></td><td><code>TmdbClient</code></td><td>розмова з TMDB; нащадок <code>ApiClient</code></td></tr>
+      <tr><td><code>src/ApiClient.js</code></td><td><code>ApiClient</code></td><td>абстрактний клієнт: загальний алгоритм запиту</td></tr>
+      <tr><td><code>src/ListType.js</code></td><td><code>ListType</code></td><td>value object: playing / popular / top / upcoming</td></tr>
+      <tr><td><code>src/PageNumber.js</code></td><td><code>PageNumber</code></td><td>value object: сторінка 1–500</td></tr>
+      <tr><td><code>src/Movie.js</code></td><td><code>Movie</code></td><td>один фільм</td></tr>
+      <tr><td><code>src/MoviePage.js</code></td><td><code>MoviePage</code></td><td>сторінка фільмів, нумерація</td></tr>
+      <tr><td><code>src/MovieFormatter.js</code></td><td><code>MovieFormatter</code></td><td>текст для терміналу</td></tr>
+      <tr><td><code>src/Config.js</code>, <code>src/EnvFile.js</code></td><td><code>Config</code>, <code>EnvFile</code></td><td>токен із середовища або <code>.env</code></td></tr>
+      <tr><td><code>src/errors.js</code></td><td>5 класів помилок</td><td>ієрархія помилок</td></tr>
+    </tbody>
+  </table></div>
+  <p>Файл і клас названо однаково, з великої літери. Виняток <code>cli.js</code>: на Windows файлова система не розрізняє регістр, тож <code>Cli.js</code> і <code>cli.js</code> були б одним файлом, і клас названо <code>CliApp</code>.</p>
+</section>
+
+<!-- 3 -->
+<section id="concepts">
+  <h2>3. Чотири стовпи ООП на цьому коді</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Принцип</th><th>Де в проєкті</th><th>Простими словами</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Інкапсуляція</strong></td><td><code>#token</code> у <code>TmdbClient</code>, <code>#fetchImpl</code> в <code>ApiClient</code>, <code>#value</code> у <code>PageNumber</code>, <code>#values</code> в <code>EnvFile</code></td><td>дані об'єкта сховано в приватних полях (<code>#</code>): зовні їх не прочитати й не зіпсувати, лише через методи. Токен не потрапить у лог випадково.</td></tr>
+      <tr><td><strong>Наслідування</strong></td><td><code>TmdbClient extends ApiClient</code>; <code>ApiError extends UserError extends Error</code></td><td>нащадок отримує все від предка й додає своє. Другий клієнт (інший API) успадкував би той самий алгоритм запиту.</td></tr>
+      <tr><td><strong>Поліморфізм</strong></td><td><code>describeHttpError()</code>, <code>buildHeaders()</code>, <code>serviceName</code></td><td>базовий клас викликає ці методи, не знаючи, чий саме код виконається: в <code>TmdbClient</code> вони свої. Той самий виклик, різна поведінка.</td></tr>
+      <tr><td><strong>Абстракція</strong></td><td><code>ApiClient</code> не можна створити напряму (<code>new.target</code>)</td><td>клас описує «що вміє будь-який клієнт API», а конкретику залишає нащадкам.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Окрім стовпів, у коді є ще кілька корисних прийомів: <strong>value object</strong> (<code>ListType</code>, <code>PageNumber</code>), <strong>статичні фабричні методи</strong> (<code>Movie.fromApi</code>, <code>ListType.parse</code>), <strong>шаблонний метод</strong> (<code>ApiClient.getJson</code>), <strong>ін'єкція залежностей</strong> (<code>CliApp</code>) і <strong>генератор</strong> (<code>MoviePage.numbered</code>). Усі вони розібрані нижче.</p>
+</section>
+
+<!-- 4 -->
+<section id="request">
+  <h2>4. Шлях одного запиту</h2>
+  <p>Команда: <code>node src/cli.js --type top --page 2</code>.</p>
+  <ol class="steps">
+    <li><div><code>cli.js</code> збирає об'єкти: <code>EnvFile.load('.env')</code> → <code>Config.load(...)</code> → <code>new CliApp({ config, createClient })</code>. Нічого не виконується, лише створюється.</div></li>
+    <li><div><code>CliApp.run(argv)</code> викликає приватний <code>#execute</code>. <code>parseArgs</code> розбирає прапорці.</div></li>
+    <li><div><code>ListType.parse('top')</code> → константа <code>ListType.TOP</code>. <code>PageNumber.parse('2')</code> → <code>PageNumber(2)</code>. Неправильне значення дає <code>UsageError</code> ще до мережі.</div></li>
+    <li><div><code>createClient(token)</code> створює <code>TmdbClient</code>. Якщо токена немає, <code>client.list()</code> одразу кидає <code>ConfigError</code>, і запиту не буде.</div></li>
+    <li><div><code>TmdbClient.list()</code> будує URL (<code>buildUrl</code>) і викликає <code>getJson</code> із базового класу: запит із таймаутом, заголовки з <code>buildHeaders()</code>, помилки в <code>NetworkError</code> / <code>ApiError</code>.</div></li>
+    <li><div>Відповідь перетворюється на <code>MoviePage.fromApi(data)</code>: усередині кожен запис стає <code>Movie</code>.</div></li>
+    <li><div><code>MovieFormatter.format(moviePage, listType)</code> повертає текст, <code>CliApp</code> друкує його й атрибуцію TMDB.</div></li>
+    <li><div><code>run</code> повертає <code>0</code> (або <code>1</code> при помилці), а <code>cli.js</code> записує це в <code>process.exitCode</code>.</div></li>
+  </ol>
+</section>
+
+<!-- 5 -->
+<section id="errors">
+  <h2>5. Ієрархія помилок</h2>
+  <div class="file"><div class="name"><b>src/errors.js</b><span>успадкування</span></div>
+<pre><code>// Ієрархія помилок (успадкування). Усе, що користувач може виправити сам, — це UserError:
+// Cli друкує його коротко («Error: ...»). Будь-що інше вважається багом і друкується зі стеком.
+//
+//   Error
+//    └─ UserError
+//        ├─ UsageError    — неправильні аргументи (--type, --page)
+//        ├─ ConfigError   — немає токена
+//        ├─ NetworkError  — немає звʼязку з сервісом
+//        └─ ApiError      — сервіс відповів помилкою (status зберігається в полі)
+export class UserError extends Error {
+  constructor(message, options) {
+    super(message, options);
+    this.name = new.target.name; // імʼя класу-нащадка: UsageError, ApiError, ...
+  }
+}
+
+export class UsageError extends UserError {}
+
+export class ConfigError extends UserError {}
+
+export class NetworkError extends UserError {}
+
+export class ApiError extends UserError {
+  constructor(message, status, options) {
+    super(message, options);
+    this.status = status;
+  }
+}</code></pre></div>
+  <ul>
+    <li><strong>Чому це корисно.</strong> <code>CliApp</code> питає лише «це <code>UserError</code>?» (<code>instanceof</code>). Усі п'ять класів підходять, бо всі нащадки <code>UserError</code>. Водночас код, який хоче, може розрізнити <code>NetworkError</code> і <code>ApiError</code>, наприклад, щоб повторити запит лише при мережевій помилці.</li>
+    <li><strong><code>new.target.name</code></strong> дає ім'я <em>реального</em> класу (<code>ApiError</code>, а не <code>UserError</code>), тож в логах видно, що саме сталось, без окремого поля <code>name</code> у кожному класі.</li>
+    <li><strong><code>ApiError.status</code></strong> зберігає HTTP-статус, щоб його можна було перевірити в коді, а не розбирати з тексту повідомлення.</li>
+    <li><strong><code>{ cause: err }</code></strong> у <code>NetworkError</code>: оригінальну помилку (<code>fetch failed</code>) збережено всередині нової, а не втрачено.</li>
+  </ul>
+</section>
+
+<!-- 6 -->
+<section id="domain">
+  <h2>6. Доменні класи: ListType, PageNumber, Movie, MoviePage</h2>
+
+  <h3>ListType: value object зі статичними константами</h3>
+  <div class="file"><div class="name"><b>src/ListType.js</b><span>value object</span></div>
+<pre><code>import { UsageError } from './errors.js';
+
+// Тип списку фільмів: значення --type, шлях у TMDB і заголовок для виводу.
+// Це «value object»: екземпляри створюються лише тут, як статичні константи, і заморожені.
+export class ListType {
+  static PLAYING = new ListType('playing', 'now_playing', 'Now Playing');
+  static POPULAR = new ListType('popular', 'popular', 'Popular');
+  static TOP = new ListType('top', 'top_rated', 'Top Rated');
+  static UPCOMING = new ListType('upcoming', 'upcoming', 'Upcoming');
+
+  static all() {
+    return [ListType.PLAYING, ListType.POPULAR, ListType.TOP, ListType.UPCOMING];
+  }
+
+  static keys() {
+    return ListType.all().map((type) =&gt; type.key);
+  }
+
+  // Рядок користувача → ListType (без урахування регістру й пробілів). Невідомий → UsageError.
+  static parse(value) {
+    const key = String(value ?? '').trim().toLowerCase();
+    const found = ListType.all().find((type) =&gt; type.key === key);
+    if (!found) {
+      throw new UsageError(`Unknown type "${value ?? ''}". Use one of: ${ListType.keys().join(', ')}.`);
+    }
+    return found;
+  }
+
+  constructor(key, path, title) {
+    this.key = key; // значення --type
+    this.path = path; // частина URL у TMDB
+    this.title = title; // заголовок списку у виводі
+    Object.freeze(this);
+  }
+}</code></pre></div>
+  <ul>
+    <li><strong>Статичні поля</strong> <code>ListType.TOP</code> тощо — єдині екземпляри. Усюди, де раніше був рядок <code>'top'</code>, тепер обʼєкт, у якого є й шлях TMDB, і заголовок. Не треба тримати окремий словник <code>TYPES</code>.</li>
+    <li><strong><code>Object.freeze(this)</code></strong>: після створення поля не змінити (є тест). Значення ніколи не «попливе» під час роботи.</li>
+    <li><strong><code>static parse</code></strong> — «фабричний метод»: перетворює рядок користувача на об'єкт або кидає <code>UsageError</code>. Так <code>parse('toString')</code> не проходить, бо пошук іде серед чотирьох типів, а не через <code>obj['toString']</code>.</li>
+  </ul>
+
+  <h3>PageNumber: об'єкт, який неможливо створити неправильним</h3>
+  <div class="file"><div class="name"><b>src/PageNumber.js</b><span>value object + приватне поле</span></div>
+<pre><code>import { UsageError } from './errors.js';
+
+// Номер сторінки, який уже пройшов перевірку. Не можна створити PageNumber(0) чи PageNumber(501):
+// якщо в руках є PageNumber, його значення правильне, і далі перевіряти не треба.
+export class PageNumber {
+  static MAX = 500; // TMDB не віддає сторінки далі за 500
+
+  static parse(value = '1') {
+    const number = Number(value);
+    if (!/^\d+$/.test(String(value)) || number &lt; 1 || number &gt; PageNumber.MAX) {
+      throw new UsageError(`Page must be an integer from 1 to ${PageNumber.MAX}.`);
+    }
+    return new PageNumber(number);
+  }
+
+  #value;
+
+  constructor(value) {
+    if (!Number.isInteger(value) || value &lt; 1 || value &gt; PageNumber.MAX) {
+      throw new RangeError(`Invalid page number: ${value}`);
+    }
+    this.#value = value;
+    Object.freeze(this);
+  }
+
+  get value() {
+    return this.#value;
+  }
+
+  toString() {
+    return String(this.#value);
+  }
+}</code></pre></div>
+  <p>Було: <code>parsePage</code> повертав число, і кожне місце, що його отримало, мусило довіряти, що воно перевірене. Тепер перевірка в конструкторі: якщо у функцію прийшов <code>PageNumber</code>, значення гарантовано від 1 до 500. Конструктор викидає <code>RangeError</code> (це помилка програміста, а не користувача), а <code>parse</code> — <code>UsageError</code> (це помилка введення).</p>
+
+  <h3>Movie і MoviePage: свої поля замість чужого JSON</h3>
+  <div class="file"><div class="name"><b>src/Movie.js</b><span>модель</span></div>
+<pre><code>// Один фільм. Приймає відповідь TMDB (snake_case) один раз у fromApi, а далі решта коду
+// працює зі своїми полями й обчислюваними властивостями. Форматування для терміналу тут немає:
+// воно в MovieFormatter, щоб модель не знала, як її показують.
+export class Movie {
+  static OVERVIEW_MAX = 110;
+
+  static fromApi(raw) {
+    return new Movie({
+      title: raw.title,
+      releaseDate: raw.release_date,
+      voteAverage: raw.vote_average,
+      voteCount: raw.vote_count,
+      overview: raw.overview,
+    });
+  }
+
+  constructor({ title, releaseDate, voteAverage, voteCount, overview }) {
+    this.title = title;
+    this.releaseDate = releaseDate;
+    this.voteAverage = voteAverage;
+    this.voteCount = voteCount;
+    this.overview = overview;
+  }
+
+  get year() {
+    return this.releaseDate ? this.releaseDate.slice(0, 4) : 'n/a';
+  }
+
+  get hasRatings() {
+    return Boolean(this.voteCount);
+  }
+
+  // Опис в один рядок, обрізаний до OVERVIEW_MAX символів
+  get shortOverview() {
+    const flat = (this.overview ?? '').replace(/\s+/g, ' ').trim();
+    const max = Movie.OVERVIEW_MAX;
+    return flat.length &gt; max ? `${flat.slice(0, max - 3).trimEnd()}...` : flat;
+  }
+}</code></pre></div>
+  <div class="file"><div class="name"><b>src/MoviePage.js</b><span>колекція + генератор</span></div>
+<pre><code>import { Movie } from './Movie.js';
+
+// Одна сторінка відповіді TMDB: номер, скільки всього сторінок і фільми (колекція обʼєктів Movie).
+export class MoviePage {
+  static SIZE = 20; // стільки фільмів TMDB віддає на сторінку
+
+  static fromApi(data) {
+    return new MoviePage({
+      page: data.page,
+      totalPages: data.total_pages,
+      movies: (data.results ?? []).map((raw) =&gt; Movie.fromApi(raw)),
+    });
+  }
+
+  constructor({ page, totalPages, movies }) {
+    this.page = page;
+    this.totalPages = totalPages;
+    this.movies = movies;
+  }
+
+  get isEmpty() {
+    return this.movies.length === 0;
+  }
+
+  // Нумерація наскрізна між сторінками: на сторінці 2 перший фільм має номер 21
+  get offset() {
+    return (this.page - 1) * MoviePage.SIZE;
+  }
+
+  // Ітерація «номер + фільм». Генератор: значення віддаються по одному.
+  *numbered() {
+    for (const [i, movie] of this.movies.entries()) {
+      yield { number: this.offset + i + 1, movie };
+    }
+  }
+}</code></pre></div>
+  <ul>
+    <li><strong><code>Movie.fromApi</code></strong> — єдине місце, де зустрічаються <code>release_date</code> і <code>vote_average</code>. Якщо TMDB змінить формат, правка буде лише тут.</li>
+    <li><strong>Обчислювані властивості (<code>get</code>)</strong>: <code>year</code>, <code>hasRatings</code>, <code>shortOverview</code> виглядають як поля, а рахуються при зверненні. Логіка «що таке рік фільму» живе разом з даними.</li>
+    <li><strong><code>*numbered()</code></strong> — генератор: віддає пари «номер + фільм» по одній. Наскрізна нумерація (<code>offset + i + 1</code>) тепер у <code>MoviePage</code>, бо вона залежить від номера сторінки, який ця модель і знає.</li>
+    <li><strong>Чому <code>Movie</code> не вміє форматувати себе.</strong> Тоді модель знала б, як її показують у терміналі, і зміна виводу чіпала б модель. Це окрема відповідальність, наступний розділ.</li>
+  </ul>
+</section>
+
+<!-- 7 -->
+<section id="client">
+  <h2>7. ApiClient і TmdbClient: наслідування й поліморфізм</h2>
+  <div class="file"><div class="name"><b>src/ApiClient.js</b><span>абстрактний предок</span></div>
+<pre><code>import { ApiError, NetworkError } from './errors.js';
+
+// Абстрактний клієнт HTTP API. Тут лежить ЗАГАЛЬНИЙ алгоритм запиту (патерн «шаблонний метод»):
+//   1. зробити запит із таймаутом;   2. мережа впала → NetworkError;
+//   3. статус не 2xx → ApiError;     4. тіло не JSON → ApiError.
+// А те, що різниться між сервісами (імʼя, заголовки, тексти помилок), нащадок дає сам, перевизначивши
+// serviceName, buildHeaders і describeHttpError.
+export class ApiClient {
+  static DEFAULT_TIMEOUT_MS = 10_000;
+
+  #fetchImpl;
+  #timeoutMs;
+
+  // fetchImpl передається ззовні: у тестах підставляємо підроблений fetch, мережа не потрібна
+  constructor({ fetchImpl = fetch, timeoutMs = ApiClient.DEFAULT_TIMEOUT_MS } = {}) {
+    if (new.target === ApiClient) throw new TypeError('ApiClient is abstract: use a subclass');
+    this.#fetchImpl = fetchImpl;
+    this.#timeoutMs = timeoutMs;
+  }
+
+  // ── Що має дати нащадок ──
+  get serviceName() {
+    throw new Error(`${this.constructor.name} must define serviceName`);
+  }
+
+  buildHeaders() {
+    return { accept: 'application/json' };
+  }
+
+  describeHttpError(status, apiMessage) {
+    return `${this.serviceName} error ${status}${apiMessage ? `: ${apiMessage}` : ''}`;
+  }
+
+  // ── Загальний алгоритм (шаблонний метод) ──
+  async getJson(url) {
+    let response;
+    try {
+      response = await this.#fetchImpl(url, {
+        headers: this.buildHeaders(),
+        signal: AbortSignal.timeout(this.#timeoutMs),
+      });
+    } catch (err) {
+      const reason = err.name === 'TimeoutError' ? 'request timed out' : (err.cause?.code ?? err.message);
+      throw new NetworkError(`Cannot reach ${this.serviceName}: ${reason}. Check your internet connection.`, { cause: err });
+    }
+
+    if (!response.ok) {
+      let apiMessage;
+      try {
+        apiMessage = (await response.json()).status_message;
+      } catch {
+        // тіло помилки може бути не JSON — тоді вистачить коду статусу
+      }
+      throw new ApiError(this.describeHttpError(response.status, apiMessage), response.status);
+    }
+
+    try {
+      return await response.json();
+    } catch {
+      throw new ApiError(`${this.serviceName} returned an invalid response.`, response.status);
+    }
+  }
+}</code></pre></div>
+  <div class="file"><div class="name"><b>src/TmdbClient.js</b><span>нащадок</span></div>
+<pre><code>import { ApiClient } from './ApiClient.js';
+import { ConfigError } from './errors.js';
+import { MoviePage } from './MoviePage.js';
+import { PageNumber } from './PageNumber.js';
+
+// Клієнт TMDB API v3. Успадковує загальний алгоритм запиту від ApiClient
+// і додає лише те, що відомо про TMDB: адреса, токен, тексти помилок.
+export class TmdbClient extends ApiClient {
+  static BASE_URL = 'https://api.themoviedb.org/3';
+
+  #token;
+
+  constructor({ token, ...options }) {
+    super(options); // fetchImpl, timeoutMs
+    this.#token = token;
+  }
+
+  // ── Перевизначені методи базового класу (поліморфізм) ──
+  get serviceName() {
+    return 'TMDB';
+  }
+
+  buildHeaders() {
+    return { ...super.buildHeaders(), Authorization: `Bearer ${this.#token}` };
+  }
+
+  describeHttpError(status, apiMessage) {
+    if (status === 401) return 'TMDB rejected the token (401). Check TMDB_ACCESS_TOKEN.';
+    if (status === 404) return 'TMDB returned 404: nothing found at this address.';
+    if (status === 429) return 'Too many requests (429). Wait a moment and try again.';
+    if (status &gt;= 500) return `TMDB is having problems (${status}). Try again later.`;
+    return super.describeHttpError(status, apiMessage); // решта — загальний текст із базового класу
+  }
+
+  // ── Своє ──
+  buildUrl(listType, { page = PageNumber.parse(), language, region } = {}) {
+    const url = new URL(`${TmdbClient.BASE_URL}/movie/${listType.path}`);
+    url.searchParams.set('page', String(page));
+    if (language) url.searchParams.set('language', language);
+    if (region) url.searchParams.set('region', region);
+    return url;
+  }
+
+  // Головний метод: список фільмів → MoviePage. Без токена в мережу не ходимо.
+  async list(listType, options = {}) {
+    if (!this.#token) {
+      throw new ConfigError('TMDB access token is missing. Put TMDB_ACCESS_TOKEN in .env (see README).');
+    }
+    const data = await this.getJson(this.buildUrl(listType, options));
+    return MoviePage.fromApi(data);
+  }
+}</code></pre></div>
+
+  <h3>Шаблонний метод</h3>
+  <p><code>getJson</code> у <code>ApiClient</code> задає <strong>порядок кроків</strong>: запит → помилка мережі → статус не 2xx → не JSON. А <em>деталі</em> кроків він бере в нащадка через методи, які той перевизначає:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Метод</th><th>У <code>ApiClient</code></th><th>У <code>TmdbClient</code></th></tr></thead>
+    <tbody>
+      <tr><td><code>serviceName</code></td><td>кидає «має визначити нащадок»</td><td><code>'TMDB'</code></td></tr>
+      <tr><td><code>buildHeaders()</code></td><td><code>{ accept: 'application/json' }</code></td><td>те саме <strong>плюс</strong> <code>Authorization</code> (через <code>super.buildHeaders()</code>)</td></tr>
+      <tr><td><code>describeHttpError()</code></td><td>загальний текст «error 400: …»</td><td>свої тексти для 401, 404, 429, 5xx, а решту передає <code>super</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Це і є <strong>поліморфізм</strong>: <code>getJson</code> викликає <code>this.describeHttpError(...)</code>, не знаючи, який клас перед ним. Завтра можна додати <code>OmdbClient extends ApiClient</code> з іншими текстами, не чіпаючи алгоритм.</p>
+
+  <div class="note"><strong class="t"><code>super</code> у двох ролях</strong>
+    <p><code>super(options)</code> у конструкторі викликає конструктор предка (передає йому <code>fetchImpl</code> і <code>timeoutMs</code>). <code>super.buildHeaders()</code> у методі викликає версію предка, щоб доповнити її, а не переписувати.</p></div>
+  <div class="note warn"><strong class="t">Абстрактність у JavaScript — домовленість</strong>
+    <p>У мові немає ключового слова <code>abstract</code>. Тут воно імітується двома перевірками: <code>new.target === ApiClient</code> у конструкторі (напряму створити не можна) і геттер <code>serviceName</code>, що кидає помилку. Обидва випадки покрито тестами.</p></div>
+
+  <details>
+    <summary>Було: одна функція <code>fetchMovies</code> (для порівняння)</summary>
+    <div class="inner">
+      <div class="file"><div class="name"><b>src/tmdb.js</b><span>гілка main</span></div>
+<pre><code>// Робота з TMDB API v3. fetch передається параметром, тому в тестах мережа не потрібна.
+
+export class UserError extends Error {}
+
+export const BASE_URL = 'https://api.themoviedb.org/3';
+export const MAX_PAGE = 500; // TMDB не віддає сторінки далі за 500
+const TIMEOUT_MS = 10_000;
+
+// Ключ — значення --type, path — частина URL у TMDB.
+export const TYPES = {
+  playing: { path: 'now_playing', title: 'Now Playing' },
+  popular: { path: 'popular', title: 'Popular' },
+  top: { path: 'top_rated', title: 'Top Rated' },
+  upcoming: { path: 'upcoming', title: 'Upcoming' },
+};
+
+export function parseType(value) {
+  const key = String(value ?? '').trim().toLowerCase();
+  if (!Object.hasOwn(TYPES, key)) {
+    throw new UserError(`Unknown type "${value ?? ''}". Use one of: ${Object.keys(TYPES).join(', ')}.`);
+  }
+  return key;
+}
+
+export function parsePage(value = '1') {
+  const page = Number(value);
+  if (!/^\d+$/.test(String(value)) || page &lt; 1 || page &gt; MAX_PAGE) {
+    throw new UserError(`Page must be an integer from 1 to ${MAX_PAGE}.`);
+  }
+  return page;
+}
+
+export function buildUrl({ type, page = 1, language, region }) {
+  const url = new URL(`${BASE_URL}/movie/${TYPES[type].path}`);
+  url.searchParams.set('page', String(page));
+  if (language) url.searchParams.set('language', language);
+  if (region) url.searchParams.set('region', region);
+  return url;
+}
+
+function httpErrorMessage(status, apiMessage) {
+  if (status === 401) return 'TMDB rejected the token (401). Check TMDB_ACCESS_TOKEN.';
+  if (status === 404) return 'TMDB returned 404: nothing found at this address.';
+  if (status === 429) return 'Too many requests (429). Wait a moment and try again.';
+  if (status &gt;= 500) return `TMDB is having problems (${status}). Try again later.`;
+  return `TMDB error ${status}${apiMessage ? `: ${apiMessage}` : ''}`;
+}
+
+export async function fetchMovies({ type, page, language, region, token, fetchImpl = fetch }) {
+  if (!token) {
+    throw new UserError('TMDB access token is missing. Put TMDB_ACCESS_TOKEN in .env (see README).');
+  }
+
+  let response;
+  try {
+    response = await fetchImpl(buildUrl({ type, page, language, region }), {
+      headers: { Authorization: `Bearer ${token}`, accept: 'application/json' },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    const reason = err.name === 'TimeoutError' ? 'request timed out' : (err.cause?.code ?? err.message);
+    throw new UserError(`Cannot reach TMDB: ${reason}. Check your internet connection.`);
+  }
+
+  if (!response.ok) {
+    let apiMessage;
+    try {
+      apiMessage = (await response.json()).status_message;
+    } catch {
+      // тіло помилки може бути не JSON — тоді вистачить коду статусу
+    }
+    throw new UserError(httpErrorMessage(response.status, apiMessage));
+  }
+
+  try {
+    return await response.json();
+  } catch {
+    throw new UserError('TMDB returned an invalid response.');
+  }
+}</code></pre></div>
+      <p>Усе в одному місці: валідація, URL, запит, помилки. Працює, але щоб додати другий API, довелось би копіювати блок із <code>try/catch</code> і розбором статусів.</p>
+    </div>
+  </details>
+</section>
+
+<!-- 8 -->
+<section id="formatter">
+  <h2>8. MovieFormatter: показ окремо від даних</h2>
+  <div class="file"><div class="name"><b>src/MovieFormatter.js</b><span>презентація</span></div>
+<pre><code>// Показ: перетворює MoviePage на текст для терміналу. Окремий клас, бо «як показати» — це
+// незалежне рішення: CliApp отримує форматер ззовні, і його можна замінити (наприклад, на JSON).
+export class MovieFormatter {
+  static ATTRIBUTION = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
+
+  formatRating(movie) {
+    if (!movie.hasRatings) return 'no ratings yet';
+    const votes = movie.voteCount === 1 ? '1 vote' : `${movie.voteCount} votes`;
+    return `${movie.voteAverage.toFixed(1)}/10 (${votes})`;
+  }
+
+  formatMovie(movie, number) {
+    const head = `${number}. ${movie.title} (${movie.year}) - ${this.formatRating(movie)}`;
+    const overview = movie.shortOverview;
+    return overview ? `${head}\n   ${overview}` : head;
+  }
+
+  format(moviePage, listType) {
+    const header = `${listType.title} movies - page ${moviePage.page} of ${moviePage.totalPages}`;
+    if (moviePage.isEmpty) return `${header}\n\nNo movies found.`;
+    const entries = [...moviePage.numbered()].map(({ number, movie }) =&gt; this.formatMovie(movie, number));
+    return `${header}\n\n${entries.join('\n\n')}`;
+  }
+}</code></pre></div>
+  <ul>
+    <li>Клас без власного стану: лише методи. Навіщо тоді клас? Щоб <code>CliApp</code> отримував його <strong>ззовні</strong>. Нащадок <code>JsonMovieFormatter</code> з тим самим методом <code>format</code> замінив би його без змін у <code>CliApp</code> (див. вправи).</li>
+    <li><strong>Статичне поле <code>ATTRIBUTION</code></strong> — константа класу, до неї звертаються як до <code>MovieFormatter.ATTRIBUTION</code>, без створення об'єкта.</li>
+    <li>Дрібні методи (<code>formatRating</code>, <code>formatMovie</code>) можна перевизначити окремо, не переписуючи <code>format</code>.</li>
+  </ul>
+</section>
+
+<!-- 9 -->
+<section id="app">
+  <h2>9. CliApp і cli.js: ін'єкція залежностей</h2>
+  <div class="file"><div class="name"><b>src/CliApp.js</b><span>застосунок</span></div>
+<pre><code>import { parseArgs } from 'node:util';
+import { ListType } from './ListType.js';
+import { PageNumber } from './PageNumber.js';
+import { MovieFormatter } from './MovieFormatter.js';
+import { UsageError, UserError } from './errors.js';
+
+// Застосунок командного рядка: розбирає аргументи, просить клієнта список і друкує його.
+// Усі залежності приходять через конструктор (ін'єкція залежностей), а не створюються тут:
+//   • createClient(token) — фабрика клієнта, у тесті підставляємо фейковий;
+//   • formatter — як показувати; • stdout/stderr — куди друкувати.
+export class CliApp {
+  static OPTIONS = {
+    type: { type: 'string', short: 't' },
+    page: { type: 'string', short: 'p' },
+    language: { type: 'string', short: 'l' },
+    region: { type: 'string', short: 'r' },
+    help: { type: 'boolean', short: 'h' },
+  };
+
+  static HELP = `Usage: tmdb-app --type &lt;${ListType.keys().join('|')}&gt; [options]
+
+Types:
+  playing   movies that are in theatres now
+  popular   popular movies
+  top       top rated movies
+  upcoming  upcoming movies
+
+Options:
+  --type &lt;name&gt;       which list to show (required)
+  --page &lt;n&gt;          page number, 1-500 (default 1)
+  --language &lt;code&gt;   language of titles and overviews, e.g. uk-UA (default en-US)
+  --region &lt;code&gt;     country code for release dates, e.g. UA
+  --help              show this help
+
+The token is read from TMDB_ACCESS_TOKEN (environment variable or .env file).
+`;
+
+  #config;
+  #createClient;
+  #formatter;
+  #stdout;
+  #stderr;
+
+  constructor({ config, createClient, formatter = new MovieFormatter(), stdout = console, stderr = console }) {
+    this.#config = config;
+    this.#createClient = createClient;
+    this.#formatter = formatter;
+    this.#stdout = stdout;
+    this.#stderr = stderr;
+  }
+
+  // Повертає код виходу: 0 — успіх, 1 — помилка. Помилки не вилітають назовні, а друкуються тут.
+  async run(argv) {
+    try {
+      await this.#execute(argv);
+      return 0;
+    } catch (err) {
+      this.#stderr.error(CliApp.isKnownError(err) ? `Error: ${err.message}` : err);
+      return 1;
+    }
+  }
+
+  // «Відома» помилка = користувач міг її виправити (наша UserError або помилка розбору аргументів Node)
+  static isKnownError(err) {
+    return err instanceof UserError
+      || err?.code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION'
+      || err?.code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE';
+  }
+
+  async #execute(argv) {
+    const { values } = parseArgs({ args: argv, options: CliApp.OPTIONS });
+    if (values.help) return this.#stdout.log(CliApp.HELP);
+    if (values.type === undefined) throw new UsageError(`Missing --type.\n\n${CliApp.HELP}`);
+
+    const listType = ListType.parse(values.type);
+    const page = PageNumber.parse(values.page);
+
+    const client = this.#createClient(this.#config.token);
+    const moviePage = await client.list(listType, { page, language: values.language, region: values.region });
+
+    this.#stdout.log(this.#formatter.format(moviePage, listType));
+    this.#stdout.log(`\n${MovieFormatter.ATTRIBUTION}`);
+  }
+}</code></pre></div>
+  <div class="file"><div class="name"><b>src/cli.js</b><span>composition root</span></div>
+<pre><code>#!/usr/bin/env node
+// Точка входу й composition root: єдине місце, де створюються обʼєкти й з'єднуються між собою.
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { CliApp } from './CliApp.js';
+import { Config } from './Config.js';
+import { EnvFile } from './EnvFile.js';
+import { TmdbClient } from './TmdbClient.js';
+
+const projectDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+const app = new CliApp({
+  config: Config.load({ envFile: EnvFile.load(join(projectDir, '.env')) }),
+  createClient: (token) =&gt; new TmdbClient({ token }),
+});
+
+process.exitCode = await app.run(process.argv.slice(2));</code></pre></div>
+  <ul>
+    <li><strong>Залежності приходять у конструктор.</strong> <code>CliApp</code> не пише <code>new TmdbClient(...)</code> і не звертається до <code>console</code> напряму: клієнта створює переданий <code>createClient</code>, друкує переданий <code>stdout</code>. У тесті замість них підставляються підробки, тому тести <code>cli.test.js</code> не ходять в мережу й нічого не друкують у консоль.</li>
+    <li><strong><code>run</code> повертає код виходу, а не викликає <code>process.exit</code>.</strong> Так клас можна викликати з тесту й перевірити результат. Присвоєння <code>process.exitCode</code> робить лише <code>cli.js</code>.</li>
+    <li><strong>Приватний <code>#execute</code></strong> — внутрішня справа класу, ззовні недоступна. Публічний лише <code>run</code>.</li>
+    <li><strong>Статичні члени</strong> (<code>OPTIONS</code>, <code>HELP</code>, <code>isKnownError</code>) не залежать від конкретного екземпляра, тому прив'язані до класу.</li>
+    <li><strong>Composition root.</strong> <code>cli.js</code> — єдине місце, де з'єднано реальні класи. Це та сама ідея, що й у Weather Dashboard.</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section id="config">
+  <h2>10. Config і EnvFile</h2>
+  <div class="file"><div class="name"><b>src/EnvFile.js</b><span>читання .env</span></div>
+<pre><code>import { existsSync, readFileSync } from 'node:fs';
+
+// Вміст .env-файлу: рядки KEY=VALUE, коментарі з #, значення можна брати в лапки.
+// Значення ховаються в приватне поле (#values): ззовні їх читають лише через get().
+export class EnvFile {
+  #values;
+
+  constructor(values = {}) {
+    this.#values = { ...values };
+  }
+
+  // Розбір тексту (без файлової системи: легко тестувати)
+  static parse(text) {
+    const values = {};
+    for (const line of text.split(/\r?\n/)) {
+      const match = /^\s*([A-Za-z_]\w*)\s*=\s*(.*?)\s*$/.exec(line);
+      if (!match) continue; // порожній рядок, коментар або сміття
+      values[match[1]] = match[2].replace(/^(["'])(.*)\1$/, '$2');
+    }
+    return new EnvFile(values);
+  }
+
+  // Файлу немає — це не помилка: повертаємо порожній EnvFile
+  static load(file) {
+    return existsSync(file) ? EnvFile.parse(readFileSync(file, 'utf8')) : new EnvFile();
+  }
+
+  get(key) {
+    return this.#values[key];
+  }
+
+  toObject() {
+    return { ...this.#values };
+  }
+}</code></pre></div>
+  <div class="file"><div class="name"><b>src/Config.js</b><span>вибір токена</span></div>
+<pre><code>import { EnvFile } from './EnvFile.js';
+
+// Налаштування програми. Токен береться зі змінної середовища, а якщо її немає, з .env-файлу.
+export class Config {
+  static TOKEN_KEY = 'TMDB_ACCESS_TOKEN';
+
+  // env і envFile передаються ззовні, тож у тестах не треба чіпати process.env чи диск
+  static load({ env = process.env, envFile = new EnvFile() } = {}) {
+    return new Config({ token: env[Config.TOKEN_KEY] || envFile.get(Config.TOKEN_KEY) });
+  }
+
+  constructor({ token }) {
+    this.token = token;
+  }
+}</code></pre></div>
+  <ul>
+    <li><code>EnvFile.parse(text)</code> працює з рядком, а <code>EnvFile.load(file)</code> додає читання з диска. Розбір можна перевірити без файлів.</li>
+    <li><code>toObject()</code> повертає <strong>копію</strong>: змінивши її, не зіпсуєш <code>EnvFile</code> (є тест). Це «захисне копіювання».</li>
+    <li><code>Config.load({ env, envFile })</code> отримує <code>process.env</code> параметром, тож тест передає свій об'єкт. Правило «змінна середовища важливіша за <code>.env</code>» записано в одному рядку й покрите тестом.</li>
+  </ul>
+</section>
+
+<!-- 11 -->
+<section id="tests">
+  <h2>11. Тести</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Файл</th><th>Що перевіряє</th><th>Тестів</th></tr></thead>
+    <tbody>
+      <tr><td><code>test/models.test.js</code></td><td>помилки, <code>ListType</code>, <code>PageNumber</code>, <code>Movie</code>, <code>MoviePage</code>, <code>MovieFormatter</code></td><td class="num">14</td></tr>
+      <tr><td><code>test/tmdb.test.js</code></td><td><code>ApiClient</code> (абстрактність), <code>TmdbClient</code> (токен, заголовки, усі види помилок)</td><td class="num">9</td></tr>
+      <tr><td><code>test/cli.test.js</code></td><td><code>CliApp</code> із підробленим клієнтом і виводом</td><td class="num">7</td></tr>
+      <tr><td><code>test/config.test.js</code></td><td><code>EnvFile</code>, <code>Config</code></td><td class="num">4</td></tr>
+    </tbody>
+  </table></div>
+  <div class="file"><div class="name"><b>test/cli.test.js</b><span>ін'єкція залежностей у дії</span></div>
+<pre><code>// Тести CliApp: усі залежності підроблені (клієнт, вивід), тож ні мережі, ні справжнього консолі.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { CliApp } from '../src/CliApp.js';
+import { Config } from '../src/Config.js';
+import { ListType } from '../src/ListType.js';
+import { Movie } from '../src/Movie.js';
+import { MoviePage } from '../src/MoviePage.js';
+import { MovieFormatter } from '../src/MovieFormatter.js';
+import { ApiError } from '../src/errors.js';
+
+// Підроблений «консоль»: збирає все, що друкується
+const sink = () =&gt; {
+  const lines = [];
+  return { lines, log: (x) =&gt; lines.push(String(x)), error: (x) =&gt; lines.push(String(x)) };
+};
+
+function setup({ client, token = 'tok' } = {}) {
+  const stdout = sink();
+  const stderr = sink();
+  const created = [];
+  const defaultClient = {
+    calls: [],
+    async list(type, options) {
+      this.calls.push({ type, options });
+      return new MoviePage({
+        page: 1, totalPages: 1,
+        movies: [new Movie({ title: 'Alpha', releaseDate: '2023-01-01', voteAverage: 8, voteCount: 2, overview: 'ok' })],
+      });
+    },
+  };
+  const theClient = client ?? defaultClient;
+  const app = new CliApp({
+    config: new Config({ token }),
+    createClient: (t) =&gt; { created.push(t); return theClient; },
+    stdout,
+    stderr,
+  });
+  return { app, stdout, stderr, created, client: theClient };
+}
+
+test('--help: друкує довідку, код 0, клієнта не створює', async () =&gt; {
+  const { app, stdout, created } = setup();
+  assert.equal(await app.run(['--help']), 0);
+  assert.equal(stdout.lines[0], CliApp.HELP);
+  assert.equal(created.length, 0);
+});
+
+test('без --type: код 1, повідомлення містить довідку', async () =&gt; {
+  const { app, stderr } = setup();
+  assert.equal(await app.run([]), 1);
+  assert.match(stderr.lines[0], /^Error: Missing --type\./);
+  assert.match(stderr.lines[0], /Usage: tmdb-app/);
+});
+
+test('успіх: клієнт отримує токен, тип і сторінку; друкується список і атрибуція', async () =&gt; {
+  const { app, stdout, created, client } = setup();
+  assert.equal(await app.run(['-t', 'TOP', '-p', '2', '-l', 'uk-UA', '-r', 'UA']), 0);
+  assert.deepEqual(created, ['tok']);
+  assert.equal(client.calls[0].type, ListType.TOP);
+  assert.equal(client.calls[0].options.page.value, 2);
+  assert.equal(client.calls[0].options.language, 'uk-UA');
+  assert.equal(client.calls[0].options.region, 'UA');
+  assert.match(stdout.lines[0], /^Top Rated movies - page 1 of 1/);
+  assert.equal(stdout.lines[1], `\n${MovieFormatter.ATTRIBUTION}`);
+});
+
+test('невідомий тип або сторінка: код 1, клієнта не створено', async () =&gt; {
+  for (const argv of [['--type', 'nope'], ['--type', 'top', '--page', '0']]) {
+    const { app, stderr, created } = setup();
+    assert.equal(await app.run(argv), 1);
+    assert.match(stderr.lines[0], /^Error: /);
+    assert.equal(created.length, 0);
+  }
+});
+
+test('помилки розбору аргументів Node теж друкуються коротко', async () =&gt; {
+  const { app, stderr } = setup();
+  assert.equal(await app.run(['--bogus']), 1);
+  assert.match(stderr.lines[0], /^Error: /);
+});
+
+test('помилка клієнта (UserError) → «Error: …», код 1', async () =&gt; {
+  const failing = { list: async () =&gt; { throw new ApiError('TMDB rejected the token (401).', 401); } };
+  const { app, stderr } = setup({ client: failing });
+  assert.equal(await app.run(['--type', 'top']), 1);
+  assert.equal(stderr.lines[0], 'Error: TMDB rejected the token (401).');
+});
+
+test('непередбачена помилка (баг) друкується повністю, а не як «Error: …»', async () =&gt; {
+  const buggy = { list: async () =&gt; { throw new TypeError('boom'); } };
+  const { app, stderr } = setup({ client: buggy });
+  assert.equal(await app.run(['--type', 'top']), 1);
+  assert.match(stderr.lines[0], /TypeError: boom/);
+  assert.ok(!stderr.lines[0].startsWith('Error: '));
+});</code></pre></div>
+  <ul>
+    <li><strong>Фейки — звичайні об'єкти.</strong> Підроблений клієнт — це <code>{ list: async () =&gt; ... }</code>; клас-нащадок не потрібен, бо JavaScript перевіряє лише наявність методу (<em>duck typing</em>).</li>
+    <li><strong>Те, чого не було в старій версії:</strong> тест, що <code>--help</code> не створює клієнта; що баг (<code>TypeError</code>) друкується повністю, а не як «Error: …»; що <code>ApiClient</code> не можна створити напряму.</li>
+  </ul>
+</section>
+
+<!-- 12 -->
+<section id="exercises">
+  <h2>12. Вправи</h2>
+  <ol>
+    <li><strong>JsonMovieFormatter.</strong> Зроби клас <code>JsonMovieFormatter extends MovieFormatter</code> з методом <code>format</code>, що повертає <code>JSON.stringify</code>. Додай прапорець <code>--json</code> у <code>CliApp</code>. Скільки файлів зміниться? (Підказка: у <code>CliApp</code> формат уже береться з поля.)</li>
+    <li><strong>Другий клієнт.</strong> Напиши <code>OmdbClient extends ApiClient</code> (інший API фільмів): які три члени треба перевизначити, а що отримаєш безкоштовно?</li>
+    <li><strong>Повтор запиту.</strong> Додай у <code>CliApp</code> одну повторну спробу, але лише для <code>NetworkError</code>. Чому тут допомагає ієрархія помилок?</li>
+    <li><strong>Зламай навмисно.</strong> Прибери <code>Object.freeze(this)</code> у <code>ListType</code>: який тест упаде? А якщо змінити <code>PageNumber.MAX</code> на 1000, що відбудеться з повідомленням про помилку?</li>
+    <li><strong>Приватне поле.</strong> Спробуй у тесті прочитати <code>client.#token</code>. Що скаже Node? Чим це краще за поле <code>_token</code> з підкресленням?</li>
+  </ol>
+  <details>
+    <summary>Перевір себе: чим <code>PageNumber</code> кращий за просте число?</summary>
+    <div class="inner"><p>Просте число може бути будь-яким, тож кожен, хто його отримує, мусить перевіряти сам або довіряти. <code>PageNumber</code> перевіряється один раз, у конструкторі, і потім у системі існують лише правильні значення. Це називається «зробити неправильні стани неможливими».</p></div>
+  </details>
+  <details>
+    <summary>Перевір себе: чому <code>ApiClient</code> не створює <code>fetch</code> сам, а отримує його в конструкторі?</summary>
+    <div class="inner"><p>Тоді у тесті можна підставити підроблений <code>fetch</code> і перевірити всі гілки помилок без мережі. Передача залежності ззовні (ін'єкція) робить клас перевірюваним і незалежним від того, звідки береться HTTP.</p></div>
+  </details>
+</section>
+
+<!-- 13 -->
+<section id="status">
+  <h2>13. Що перевірено</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Перевірка</th><th>Результат</th></tr></thead>
+    <tbody>
+      <tr><td>Тести (<code>npm test</code>)</td><td><span class="status ok">34 з 34 пройшли (було 15)</span></td></tr>
+      <tr><td>Вивід CLI у 8 сценаріях: <code>--help</code>, без аргументів, невідомий тип, сторінка 0, немає токена, невідомий прапорець, <code>--type</code> без значення, короткі прапорці</td><td><span class="status ok">ідентичний старій версії (порівняно diff-ом)</span></td></tr>
+      <tr><td>Живий запит до TMDB із справжнім токеном</td><td><span class="status no">не перевірено: токена немає</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note warn"><strong class="t">Про живий запит</strong>
+    <p>Мережеву частину перевірено лише підробленим <code>fetch</code> (усі види помилок і успішна відповідь). Щоб пересвідчитись на справжньому API, поклади токен у <code>.env</code> і виконай <code>node src/cli.js --type top</code>.</p></div>
+  <div class="note"><strong class="t">Де зміни</strong>
+    <p>Усе зроблено в гілці <code>refactor-oop</code>. Гілка <code>main</code> лишається з початковою версією, її можна порівняти: <code>git diff main refactor-oop</code>.</p></div>
+</section>
+
+
+</main>
+</div>
+</body>
+</html>

@@ -74,8 +74,15 @@ This product uses the TMDB API but is not endorsed or certified by TMDB.
 
 ## Структура
 
-- `src/tmdb.js` — URL, запит до API, перетворення помилок на зрозумілі повідомлення (`fetch` передається параметром)
-- `src/format.js` — форматування списку для терміналу
-- `src/env.js` — мінімальний розбір `.env`
-- `src/cli.js` — розбір аргументів і запуск
-- `test/` — `npm test` (вбудований `node:test`, мережа в тестах не використовується)
+Код написано на класах (гілка `refactor-oop`); докладний розбір у `guide.html`.
+
+- `src/cli.js` — точка входу й composition root: створює обʼєкти й з'єднує їх
+- `src/CliApp.js` — `CliApp`: розбір аргументів, запуск, друк, код виходу (залежності передаються в конструктор)
+- `src/ApiClient.js` — абстрактний `ApiClient`: загальний алгоритм запиту (таймаут, мережа, статус, JSON)
+- `src/TmdbClient.js` — `TmdbClient extends ApiClient`: URL TMDB, токен, тексти помилок
+- `src/ListType.js`, `src/PageNumber.js` — value object-и: тип списку й номер сторінки (1–500)
+- `src/Movie.js`, `src/MoviePage.js` — модель фільму й сторінки (наскрізна нумерація)
+- `src/MovieFormatter.js` — текст для терміналу
+- `src/Config.js`, `src/EnvFile.js` — токен зі змінної середовища або `.env`
+- `src/errors.js` — ієрархія помилок: `UserError` → `UsageError`, `ConfigError`, `NetworkError`, `ApiError`
+- `test/` — `npm test` (34 тести, вбудований `node:test`, мережа в тестах не використовується)
